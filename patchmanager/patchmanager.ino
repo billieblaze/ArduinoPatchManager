@@ -19,7 +19,7 @@ int menuButton = 8;
 int buttonState;             // the current reading from the input pin
 int lastButtonState = LOW;   // the previous reading from the input pin
 long lastDebounceTime = 0;  // the last time the output pin was toggled
-long debounceDelay = 100;    // the debounce time; increase if the output flickers
+long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
 // All the midi
 #include <MIDI.h>
@@ -51,12 +51,14 @@ byte programs[][5] = {
 };
 
 
-byte numPrograms = sizeof(programs);
+byte numPrograms = 15;
 
 // where on the screen am i, and how do i get to my next cursor position?
 int currentPosition = 0;
 int screenPositions[][2] =  {{ 10, 0 }, { 4, 3 }, { 8, 3 }, { 12, 3 }, {16, 3} };
 
+byte screenSelect = 0;
+byte isSaving = 0; 
 
 //#define debug true
 
@@ -78,23 +80,8 @@ void setup(){
   
   // setup ui
   pinMode(menuButton, INPUT); 
-   
-  // load the data from eeprom
-  for( int i = 0; i < 16; i++) { 
-     Serial.print(i);
-     Serial.print(":");
-     
-     for ( int j=0; j < sizeof(programs[i]); j++){ 
-       Serial.print(programs[i][j]);
-       Serial.print("  ");
-       
-       
-       programs[i][j] = EEPROM.read(eeAddress);
-       eeAddress++;
-     }
-     Serial.println();
-   }  
   
+  loadData();
 
   // initialize the lcd
   lcd.begin(20, 4);              
@@ -161,6 +148,7 @@ void readEncoders() {
 }
 
 void handleEncoder( int increment){  
+  if (screenSelect==0){ 
     // if we're on the current progam position, change program up / down
     if ( currentPosition == 0 ) {
         currentProgram += increment;
@@ -182,8 +170,14 @@ void handleEncoder( int increment){
         changeProgram( currentPosition );       
       }
       
-      paintLCD(); // refreshit
+  } else { 
+   
+    isSaving = !isSaving; 
+    
+  }
   
+  paintLCD(); // refreshit
+        
 }
 
 void readButtons(){
@@ -202,13 +196,36 @@ void readButtons(){
 
       // only respond if the new button state is HIGH
       if (buttonState == HIGH) {
+        
+          if(screenSelect == 0){ 
              currentPosition++; //move cursor
               // prevent overflow
+              if (currentPosition == 5) { 
+                screenSelect = 1; 
+                paintLCD();
+              }
+              
               if (currentPosition > 4 ) {
                 currentPosition = 0; 
               }
-        
-            paintLCD();
+          } else { 
+            if ( isSaving == 0){ 
+              lcd.setCursor(0,2);
+              lcd.print("CANCELLING...");
+              delay(200);
+              screenSelect = 0; 
+            } else { 
+              lcd.setCursor(0,2);
+              lcd.print("SAVING...");
+              delay(200);
+              lcd.setCursor(0,3);
+              saveData();
+              screenSelect = 0; 
+            }
+            
+          }
+          
+          paintLCD();
 
       }
     }
@@ -220,6 +237,12 @@ void readButtons(){
 void paintLCD() {
   lcd.clear();
   lcd.home ();                   // go home
+  
+  if (screenSelect==0) screen0();
+  if (screenSelect==1) screen1();
+}
+
+void screen0(){ 
   lcd.print("Program: ");
   lcd.print(programs[currentProgram][0]);
 
@@ -240,6 +263,39 @@ void paintLCD() {
 
   // move cursor to current position
   lcd.setCursor( screenPositions[currentPosition][0],  screenPositions[currentPosition][1]) ;
+ 
+}
 
+void screen1(){ 
+   lcd.print("Save? ");
+   
+   if ( isSaving == 0) { 
+    lcd.print("NO"); 
+   } else { 
+    lcd.print("YES");
+   }
+}
+
+void loadData(){
+  // load the data from eeprom
+  eeAddress = 0; 
+  for( int i = 0; i < 16; i++) { 
+    for ( int j=0; j < sizeof(programs[i]); j++){         
+       programs[i][j] = EEPROM.read(eeAddress);  
+       eeAddress++;
+     }
+   }   
+}
+
+void saveData(){
+  // load the data from eeprom
+  eeAddress = 0; 
+  for( int i = 0; i < 16; i++) { 
+    for ( int j=0; j < sizeof(programs[i]); j++){         
+       EEPROM.update(eeAddress, programs[i][j]);  
+       eeAddress++;
+       lcd.print(".");
+     }
+   }   
 }
 
