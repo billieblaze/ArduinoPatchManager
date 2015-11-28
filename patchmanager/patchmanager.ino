@@ -113,8 +113,6 @@ void setup(){
 void loop()
 {
   MIDI.read();   // just hanging out passing MIDI thru until we get a UI update
-
-  
   readEncoders(); 
   readButtons();
 }
@@ -153,8 +151,8 @@ void readEncoders() {
         } else {
           handleEncoder(-1); // decrement
         }
-        paintLCD(); // refreshit
       }
+      
       position = reading;  // rememberit
     }
   }
@@ -183,6 +181,8 @@ void handleEncoder( int increment){
         programs[currentProgram][currentPosition] += increment;
         changeProgram( currentPosition );       
       }
+      
+      paintLCD(); // refreshit
   
 }
 
