@@ -7,6 +7,10 @@ LiquidCrystal_I2C  lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 #include <Encoder.h>
 Encoder myEnc(2,3);
 int position = 0;
+int encoderState;             // the current reading from the input pin
+int lastEncoderState = LOW;   // the previous reading from the input pin
+long lastEncoderDebounceTime = 0;  // the last time the output pin was toggled
+
 
 int menuButton = 8;
 int buttonState;             // the current reading from the input pin
@@ -19,11 +23,11 @@ long debounceDelay = 100;    // the debounce time; increase if the output flicke
 MIDI_CREATE_DEFAULT_INSTANCE();
 
 // program variables
-int channels = 4;  // number of midi channels
-int currentProgram = 0; // currently selected program
+byte channels = 4;  // number of midi channels
+byte currentProgram = 0; // currently selected program
 
 // first program slot is just a placeholder, position 2+ are each channels patch number
-int programs[][5] = {
+byte programs[][5] = {
   {1, 10, 1, 5, 1},
   {2, 20, 2, 10, 0},
   {3, 30, 3, 15, 2},
@@ -31,8 +35,19 @@ int programs[][5] = {
   {5, 50, 5, 25, 3},
   {6, 0, 0, 0, 0},
   {7, 0, 0, 0, 0},
-  {8, 0, 0, 0, 0}
+  {8, 0, 0, 0, 0},
+  {9, 0, 0, 0, 0},
+  {10, 0, 0, 0, 0},
+  {11, 0, 0, 0, 0},
+  {12, 0, 0, 0, 0},
+  {13, 0, 0, 0, 0},
+  {14, 0, 0, 0, 0},
+  {15, 0, 0, 0, 0},
+  {16, 0, 0, 0, 0}
+  
 };
+
+byte numPrograms = sizeof(programs);
 
 // where on the screen am i, and how do i get to my next cursor position?
 int currentPosition = 0;
@@ -59,6 +74,8 @@ void setup()
 void loop()
 {
   MIDI.read();   // just hanging out passing MIDI thru until we get a UI update
+
+  
   readEncoders(); 
   readButtons();
 }
@@ -77,18 +94,32 @@ void setAllPrograms() {
 }
 
 void readEncoders() { 
-  long newPos = myEnc.read();
 
-  if (newPos != position) {
+  int reading = myEnc.read();
 
-    if (newPos > position) {
-      handleEncoder(1); // increment
-    } else {
-      handleEncoder(-1); // decrement
-    }
-    paintLCD(); // refreshit
-    position = newPos;  // rememberit
+  // debounce it 
+  if (reading != lastEncoderState) {
+    lastEncoderDebounceTime = millis();
   }
+
+  if ((millis() - lastEncoderDebounceTime) > debounceDelay) {
+  
+    if (reading != encoderState) {
+      encoderState = reading;
+
+      if (reading != position) {
+  
+        if (reading > position) {
+          handleEncoder(1); // increment
+        } else {
+          handleEncoder(-1); // decrement
+        }
+        paintLCD(); // refreshit
+      }
+      position = reading;  // rememberit
+    }
+  }
+  lastEncoderState = reading;  // clear debouncer
  
 }
 
@@ -97,12 +128,12 @@ void handleEncoder( int increment){
     if ( currentPosition == 0 ) {
         currentProgram += increment;
 
-        // only supports 0-7, will clean up when i get to memory storage
+        
         if (currentProgram < 0 ) {
-          currentProgram = 7;
+          currentProgram = numPrograms;
         }
 
-        if (currentProgram > 7 ) {
+        if (currentProgram > numPrograms ) {
           currentProgram = 0;
         }
 
@@ -111,8 +142,7 @@ void handleEncoder( int increment){
       } else {
         // we're on a specific channel, lets only update that
         programs[currentProgram][currentPosition] += increment;
-        changeProgram(currentPosition );
-        
+        changeProgram( currentPosition );       
       }
   
 }
