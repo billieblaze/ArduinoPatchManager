@@ -1,3 +1,6 @@
+#include <EEPROM.h>
+int eeAddress = 0; //EEPROM address to start reading from
+
 // setup LCD
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -28,11 +31,11 @@ byte currentProgram = 0; // currently selected program
 
 // first program slot is just a placeholder, position 2+ are each channels patch number
 byte programs[][5] = {
-  {1, 10, 1, 5, 1},
-  {2, 20, 2, 10, 0},
-  {3, 30, 3, 15, 2},
-  {4, 40, 4, 20, 0},
-  {5, 50, 5, 25, 3},
+  {1, 0, 0, 0, 0},
+  {2, 0, 0, 0, 0},
+  {3, 0, 0, 0, 0},
+  {4, 0, 0, 0, 0},
+  {5, 0, 0, 0, 0},
   {6, 0, 0, 0, 0},
   {7, 0, 0, 0, 0},
   {8, 0, 0, 0, 0},
@@ -47,28 +50,64 @@ byte programs[][5] = {
   
 };
 
+
 byte numPrograms = sizeof(programs);
 
 // where on the screen am i, and how do i get to my next cursor position?
 int currentPosition = 0;
 int screenPositions[][2] =  {{ 10, 0 }, { 4, 3 }, { 8, 3 }, { 12, 3 }, {16, 3} };
 
+
+//#define debug true
+
 // on your mark...
-void setup()
-{
-  // setup ui
-  pinMode(menuButton, INPUT);
+void setup(){
+
+  #if defined(  debug )
+      Serial.begin(9600);
+      while (!Serial) {
+        ; // wait for serial port to connect. Needed for native USB port only
+      }
+      Serial.write("Begin");
+  #endif 
+ 
   
+  #if defined(  debug )
+    Serial.print("CONFIG");
+  #endif 
+  
+  // setup ui
+  pinMode(menuButton, INPUT); 
+   
+  // load the data from eeprom
+  for( int i = 0; i < 16; i++) { 
+     Serial.print(i);
+     Serial.print(":");
+     
+     for ( int j=0; j < sizeof(programs[i]); j++){ 
+       Serial.print(programs[i][j]);
+       Serial.print("  ");
+       
+       
+       programs[i][j] = EEPROM.read(eeAddress);
+       eeAddress++;
+     }
+     Serial.println();
+   }  
+  
+
   // initialize the lcd
   lcd.begin(20, 4);              
   paintLCD();
   lcd.home();
   lcd.blink();
-
+  
+  
   // roll that beautiful bean footage
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.sendNoteOn(42, 127, 1);   // send a note for sanity.. 
   setAllPrograms(); // jam on it. 
+  
 }
 
 void loop()
